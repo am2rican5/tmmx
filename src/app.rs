@@ -4,6 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::widgets::ListState;
 
 use crate::model::{TmuxPane, TmuxSession, TmuxWindow};
+use crate::template::{self, SessionTemplate};
 use crate::tmux;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +55,7 @@ pub enum InputMode {
     TextInput,
     Confirm,
     Help,
+    TemplatePicker,
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +67,10 @@ pub enum PendingAction {
     KillSession(String),
     KillWindow(String, u32),
     KillPane(String),
+    SaveTemplate(String),
+    OverwriteTemplate(String, SessionTemplate),
+    LaunchTemplate(SessionTemplate),
+    DeleteTemplate(String),
 }
 
 #[derive(Debug, Clone)]
@@ -98,6 +104,9 @@ pub struct App {
 
     pub status: Option<StatusMessage>,
 
+    pub templates: Vec<SessionTemplate>,
+    pub template_state: ListState,
+
     pub last_refresh: Instant,
     pub refresh_interval_secs: u64,
 }
@@ -122,6 +131,8 @@ impl App {
             pending_action: None,
             confirm_message: String::new(),
             status: None,
+            templates: Vec::new(),
+            template_state: ListState::default(),
             last_refresh: Instant::now(),
             refresh_interval_secs: 2,
         };
@@ -279,6 +290,7 @@ impl App {
             InputMode::Help => self.handle_help_key(key),
             InputMode::Confirm => self.handle_confirm_key(key),
             InputMode::TextInput => self.handle_text_input_key(key),
+            InputMode::TemplatePicker => self.handle_template_picker_key(key),
             InputMode::Normal => self.handle_normal_key(key),
         }
     }
@@ -413,6 +425,24 @@ impl App {
             }
             KeyCode::Enter => {
                 self.switch_to_selected_session();
+            }
+            KeyCode::Char('S') => {
+                if let Some(session) = self.selected_session() {
+                    self.start_text_input(
+                        "Template name: ",
+                        &session.name,
+                        PendingAction::SaveTemplate(session.name.clone()),
+                    );
+                }
+            }
+            KeyCode::Char('t') => {
+                self.templates = template::load_all_templates();
+                if !self.templates.is_empty() {
+                    self.template_state.select(Some(0));
+                } else {
+                    self.template_state.select(None);
+                }
+                self.mode = InputMode::TemplatePicker;
             }
             _ => {}
         }
@@ -576,6 +606,14 @@ impl App {
             PendingAction::KillPane(ref id) => {
                 tmux::kill_pane(id).map(|_| format!("Pane '{}' killed", id))
             }
+            PendingAction::DeleteTemplate(ref name) => {
+                template::delete_template(name).map(|_| format!("Template '{}' deleted", name))
+            }
+            PendingAction::OverwriteTemplate(ref name, ref t) => {
+                let mut t = t.clone();
+                t.template.name = name.clone();
+                template::save_template(&t).map(|_| format!("Template '{}' saved", name))
+            }
             _ => return,
         };
         match result {
@@ -616,6 +654,40 @@ impl App {
                 }
                 tmux::rename_window(session, index, value)
                     .map(|_| format!("Window renamed to '{}'", value))
+            }
+            PendingAction::SaveTemplate(ref session_name) => {
+                if value.is_empty() {
+                    return;
+                }
+                // Check if template exists — if so, confirm overwrite
+                if template::template_exists(value) {
+                    match template::capture_session_as_template(session_name) {
+                        Ok(mut t) => {
+                            t.template.name = value.to_string();
+                            self.start_confirm(
+                                &format!("Template '{}' exists. Overwrite? (y/n)", value),
+                                PendingAction::OverwriteTemplate(value.to_string(), t),
+                            );
+                            return;
+                        }
+                        Err(e) => return self.set_status(e.to_string(), true),
+                    }
+                }
+                match template::capture_session_as_template(session_name) {
+                    Ok(mut t) => {
+                        t.template.name = value.to_string();
+                        template::save_template(&t)
+                            .map(|_| format!("Template '{}' saved", value))
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            PendingAction::LaunchTemplate(ref t) => {
+                if value.is_empty() {
+                    return;
+                }
+                template::launch_template(t, value)
+                    .map(|_| format!("Session '{}' created from template", value))
             }
             _ => return,
         };
@@ -733,6 +805,63 @@ impl App {
                 Err(e) => self.set_status(e.to_string(), true),
             }
         }
+    }
+
+    fn handle_template_picker_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = InputMode::Normal;
+            }
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !self.templates.is_empty() {
+                    let i = self.template_state.selected().unwrap_or(0);
+                    let next = if i >= self.templates.len() - 1 {
+                        self.templates.len() - 1
+                    } else {
+                        i + 1
+                    };
+                    self.template_state.select(Some(next));
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if !self.templates.is_empty() {
+                    let i = self.template_state.selected().unwrap_or(0);
+                    self.template_state.select(Some(i.saturating_sub(1)));
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(idx) = self.template_state.selected() {
+                    if let Some(t) = self.templates.get(idx).cloned() {
+                        self.mode = InputMode::Normal;
+                        let name = t.template.name.clone();
+                        self.start_text_input(
+                            "Session name: ",
+                            &name,
+                            PendingAction::LaunchTemplate(t),
+                        );
+                    }
+                }
+            }
+            KeyCode::Char('d') => {
+                if let Some(idx) = self.template_state.selected() {
+                    if let Some(t) = self.templates.get(idx) {
+                        let name = t.template.name.clone();
+                        self.mode = InputMode::Normal;
+                        self.start_confirm(
+                            &format!("Delete template '{}'? (y/n)", name),
+                            PendingAction::DeleteTemplate(name),
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn selected_template(&self) -> Option<&SessionTemplate> {
+        self.template_state
+            .selected()
+            .and_then(|i| self.templates.get(i))
     }
 
     pub fn tick(&mut self) {

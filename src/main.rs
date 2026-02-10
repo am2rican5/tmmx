@@ -1,6 +1,7 @@
 mod app;
 mod event;
 mod model;
+mod template;
 mod tmux;
 mod ui;
 

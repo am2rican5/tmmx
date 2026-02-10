@@ -38,6 +38,8 @@ pub fn draw_help(frame: &mut Frame, app: &App) {
             key_line("r", "Rename session"),
             key_line("d", "Kill session"),
             key_line("Enter", "Switch to session"),
+            key_line("S", "Save as template"),
+            key_line("t", "Open templates"),
         ],
         Panel::Windows => vec![
             section_header("Windows"),

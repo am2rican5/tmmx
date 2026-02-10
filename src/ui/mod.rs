@@ -4,6 +4,7 @@ mod panes;
 mod preview;
 mod prompt;
 mod sessions;
+mod template_picker;
 mod windows;
 
 use ratatui::Frame;
@@ -44,6 +45,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
     if app.mode == InputMode::Confirm {
         prompt::draw_confirm(frame, app);
+    }
+    if app.mode == InputMode::TemplatePicker {
+        template_picker::draw_template_picker(frame, app);
     }
     if app.mode == InputMode::Help {
         help::draw_help(frame, app);

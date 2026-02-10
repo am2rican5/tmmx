@@ -157,6 +157,11 @@ pub fn new_session(name: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn new_session_with_cwd(name: &str, cwd: &str) -> Result<()> {
+    run_tmux(&["new-session", "-d", "-s", name, "-c", cwd])?;
+    Ok(())
+}
+
 pub fn kill_session(name: &str) -> Result<()> {
     run_tmux(&["kill-session", "-t", name])?;
     Ok(())
@@ -172,6 +177,17 @@ pub fn new_window(session: &str, name: Option<&str>) -> Result<()> {
         Some(n) if !n.is_empty() => run_tmux(&["new-window", "-d", "-t", session, "-n", n])?,
         _ => run_tmux(&["new-window", "-d", "-t", session])?,
     };
+    Ok(())
+}
+
+pub fn new_window_with_cwd(session: &str, name: &str, cwd: &str) -> Result<()> {
+    run_tmux(&["new-window", "-t", session, "-n", name, "-c", cwd])?;
+    Ok(())
+}
+
+pub fn split_window_in_dir(session: &str, window_index: u32, direction: &str, cwd: &str) -> Result<()> {
+    let target = format!("{}:{}", session, window_index);
+    run_tmux(&["split-window", direction, "-t", &target, "-c", cwd])?;
     Ok(())
 }
 
