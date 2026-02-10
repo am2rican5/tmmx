@@ -2,6 +2,9 @@
 name = "tmx"
 version = "0.1.0"
 edition = "2024"
+description = "A terminal UI for managing tmux sessions, windows, and panes"
+license = "MIT"
+repository = "https://github.com/am2rican5/tmx"
 
 [dependencies]
 ratatui = "0.30"
