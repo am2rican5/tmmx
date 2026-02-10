@@ -211,7 +211,7 @@ pub fn resize_pane_zoom(pane_id: &str) -> Result<()> {
 }
 
 pub fn break_pane(pane_id: &str) -> Result<()> {
-    run_tmux(&["break-pane", "-t", pane_id])?;
+    run_tmux(&["break-pane", "-s", pane_id])?;
     Ok(())
 }
 
