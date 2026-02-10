@@ -1,5 +1,5 @@
 [package]
-name = "tmx"
+name = "tmmx"
 version = "0.1.0"
 edition = "2024"
 description = "A terminal UI for managing tmux sessions, windows, and panes"
