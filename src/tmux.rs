@@ -210,6 +210,11 @@ pub fn resize_pane_zoom(pane_id: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn break_pane(pane_id: &str) -> Result<()> {
+    run_tmux(&["break-pane", "-t", pane_id])?;
+    Ok(())
+}
+
 pub fn switch_client(target: &str) -> Result<()> {
     run_tmux(&["switch-client", "-t", target])?;
     Ok(())

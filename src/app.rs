@@ -497,6 +497,9 @@ impl App {
             KeyCode::Char('z') => {
                 self.toggle_zoom_pane();
             }
+            KeyCode::Char('w') => {
+                self.break_pane_to_window();
+            }
             _ => {}
         }
     }
@@ -715,6 +718,18 @@ impl App {
         if let Some(pane) = self.selected_pane() {
             match tmux::resize_pane_zoom(&pane.id) {
                 Ok(_) => self.set_status("Pane zoom toggled".to_string(), false),
+                Err(e) => self.set_status(e.to_string(), true),
+            }
+        }
+    }
+
+    fn break_pane_to_window(&mut self) {
+        if let Some(pane) = self.selected_pane() {
+            match tmux::break_pane(&pane.id) {
+                Ok(_) => {
+                    self.set_status("Pane broken to new window".to_string(), false);
+                    self.refresh_tmux_state();
+                }
                 Err(e) => self.set_status(e.to_string(), true),
             }
         }

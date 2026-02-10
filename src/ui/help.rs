@@ -56,6 +56,7 @@ pub fn draw_help(frame: &mut Frame, app: &App) {
             key_line("N", "Split horizontal"),
             key_line("d", "Kill pane"),
             key_line("z", "Toggle zoom"),
+            key_line("w", "Break to window"),
             key_line("Enter", "Switch to pane"),
         ],
         Panel::Preview => vec![
