@@ -8,29 +8,13 @@ use ratatui::widgets::Paragraph;
 
 use crate::app::{App, Panel};
 use super::panel_block;
-use super::layout_minimap;
 
 pub fn draw_preview(frame: &mut Frame, app: &App, area: Rect) {
     let focused = app.focused == Panel::Preview;
-    let block = panel_block("[4] Preview", focused);
-
-    // When Panes panel is focused, try rendering the layout minimap
-    if app.focused == Panel::Panes {
-        // Render the block first, then draw minimap in the inner area
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-        if !layout_minimap::draw_layout_minimap(frame, app, inner) {
-            // Fallback: minimap couldn't fit, render pane capture over the inner area
-            let content = render_pane_with_header(app);
-            let fallback = Paragraph::new(content);
-            frame.render_widget(fallback, inner);
-        }
-        return;
-    }
+    let block = panel_block("Preview", focused);
 
     let content = match app.focused {
         Panel::Sessions => render_session_details(app),
-        Panel::Windows => render_window_details(app),
         _ => render_pane_with_header(app),
     };
 
@@ -182,67 +166,7 @@ fn render_session_details(app: &App) -> Vec<Line<'static>> {
     }
 }
 
-fn render_window_details(app: &App) -> Vec<Line<'static>> {
-    match app.selected_window() {
-        Some(window) => {
-            let session_name = app
-                .selected_session()
-                .map(|s| s.name)
-                .unwrap_or_default();
 
-            let flags_display = if window.flags.trim().is_empty() || window.flags.trim() == "-" {
-                "none".to_string()
-            } else {
-                window.flags.trim().to_string()
-            };
-
-            // Parse layout type from the layout string (e.g., "ab12,80x24,0,0,0" → extract dimensions)
-            let layout_short = simplify_layout(&window.layout);
-
-            let mut lines = vec![
-                section_header(format!("  {}:{}", session_name, window.name)),
-                Line::from(""),
-                label_value("  Index     ", window.index.to_string()),
-                label_value("  ID        ", window.id.clone()),
-                label_value("  Panes     ", window.panes.to_string()),
-                label_value("  Active    ", if window.active { "yes" } else { "no" }.to_string()),
-                label_value("  Layout    ", layout_short),
-                label_value("  Flags     ", flags_display),
-            ];
-
-            if !app.panes.is_empty() {
-                lines.push(Line::from(""));
-                lines.push(separator_line());
-                lines.push(section_header("  Panes".to_string()));
-                lines.push(Line::from(""));
-                for p in &app.panes {
-                    let active = if p.active { "*" } else { " " };
-                    let short_cwd = shorten_path(&p.cwd);
-                    lines.push(Line::from(vec![
-                        Span::styled(
-                            format!("  {}{}", active, p.index),
-                            Style::default().fg(Color::DarkGray),
-                        ),
-                        Span::styled(
-                            format!("  {}", p.command),
-                            Style::default().fg(Color::White),
-                        ),
-                        Span::styled(
-                            format!("  {}", short_cwd),
-                            Style::default().fg(Color::DarkGray),
-                        ),
-                    ]));
-                }
-            }
-
-            lines
-        }
-        None => vec![Line::from(Span::styled(
-            "(no window selected)",
-            Style::default().fg(Color::DarkGray),
-        ))],
-    }
-}
 
 fn render_pane_info_header(app: &App) -> Vec<Line<'static>> {
     match app.selected_pane() {
@@ -298,13 +222,3 @@ fn render_pane_with_header(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
-fn simplify_layout(layout: &str) -> String {
-    // tmux layout strings look like "ab12,80x24,0,0,0" or more complex nested forms
-    // Extract the dimensions portion if present
-    if let Some((_checksum, rest)) = layout.split_once(',') {
-        if let Some((dims, _)) = rest.split_once(',') {
-            return dims.to_string();
-        }
-    }
-    layout.to_string()
-}

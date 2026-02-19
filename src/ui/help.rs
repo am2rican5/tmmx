@@ -24,7 +24,7 @@ pub fn draw_help(frame: &mut Frame, app: &App) {
         key_line("q", "Quit"),
         key_line("?", "Toggle help"),
         key_line("R", "Force refresh"),
-        key_line("1-4", "Switch panel"),
+        key_line("1-3", "Switch panel"),
         key_line("Tab/S-Tab", "Next/prev panel"),
         Line::from(""),
     ];
@@ -61,10 +61,7 @@ pub fn draw_help(frame: &mut Frame, app: &App) {
             key_line("w", "Break to window"),
             key_line("Enter", "Switch to pane"),
         ],
-        Panel::Preview => vec![
-            section_header("Preview"),
-            key_line("h/l ←/→", "Switch panel"),
-        ],
+        Panel::Preview => vec![], // not focusable
     };
 
     lines.extend(panel_lines);

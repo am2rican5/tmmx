@@ -1,5 +1,4 @@
 mod help;
-mod layout_minimap;
 mod panes;
 mod preview;
 mod prompt;
@@ -122,7 +121,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         )))
     } else {
         Paragraph::new(Line::from(Span::styled(
-            " q:quit  ?:help  1-4:panels  n:new  r:rename  d:delete  Enter:switch  R:refresh",
+            " q:quit  ?:help  1-3:panels  n:new  r:rename  d:delete  Enter:switch  R:refresh",
             Style::default().fg(Color::DarkGray),
         )))
     };

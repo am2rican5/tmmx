@@ -16,14 +16,14 @@ pub enum Panel {
 }
 
 impl Panel {
-    pub const ALL: [Panel; 4] = [Panel::Sessions, Panel::Windows, Panel::Panes, Panel::Preview];
+    pub const ALL: [Panel; 3] = [Panel::Sessions, Panel::Windows, Panel::Panes];
 
     pub fn index(self) -> usize {
         match self {
             Panel::Sessions => 0,
             Panel::Windows => 1,
             Panel::Panes => 2,
-            Panel::Preview => 3,
+            Panel::Preview => 2, // not navigable, same index as Panes
         }
     }
 
@@ -365,10 +365,6 @@ impl App {
                 self.focused = Panel::Panes;
                 return;
             }
-            KeyCode::Char('4') => {
-                self.focused = Panel::Preview;
-                return;
-            }
             KeyCode::Tab => {
                 self.focused = self.focused.next();
                 return;
@@ -385,7 +381,7 @@ impl App {
             Panel::Sessions => self.handle_sessions_key(key),
             Panel::Windows => self.handle_windows_key(key),
             Panel::Panes => self.handle_panes_key(key),
-            Panel::Preview => self.handle_preview_key(key),
+            Panel::Preview => {} // not focusable
         }
     }
 
@@ -529,18 +525,6 @@ impl App {
             }
             KeyCode::Char('w') => {
                 self.break_pane_to_window();
-            }
-            _ => {}
-        }
-    }
-
-    fn handle_preview_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('l') | KeyCode::Right => {
-                self.focused = self.focused.next();
-            }
-            KeyCode::Char('h') | KeyCode::Left => {
-                self.focused = self.focused.prev();
             }
             _ => {}
         }
