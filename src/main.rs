@@ -23,21 +23,7 @@ use event::{AppEvent, EventReader};
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // Check tmux is available
-    if !tmux::is_tmux_running() {
-        eprintln!("Error: tmux server is not running.");
-        eprintln!("Start tmux first, then run tmmx.");
-        std::process::exit(1);
-    }
-
-    // Setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    // Install panic hook that restores terminal
+    // Install panic hook that restores terminal (once)
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         let _ = disable_raw_mode();
@@ -45,23 +31,43 @@ fn main() -> Result<()> {
         original_hook(panic_info);
     }));
 
-    let result = run_app(&mut terminal);
+    loop {
+        // Check tmux is available (each iteration, in case server died while attached)
+        if !tmux::is_tmux_running() {
+            eprintln!("Error: tmux server is not running.");
+            eprintln!("Start tmux first, then run tmmx.");
+            std::process::exit(1);
+        }
 
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+        // Setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-    // Handle suspend (attach to tmux session from outside)
-    if let Ok(Some(target)) = &result {
-        let status = std::process::Command::new("tmux")
-            .args(["attach-session", "-t", target])
-            .status();
-        if let Err(e) = status {
-            eprintln!("Failed to attach to tmux: {}", e);
+        let result = run_app(&mut terminal);
+
+        // Restore terminal
+        disable_raw_mode()?;
+        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+
+        match result {
+            Ok(Some(target)) => {
+                // Attach to tmux session (blocks until user detaches)
+                let status = std::process::Command::new("tmux")
+                    .args(["attach-session", "-t", &target])
+                    .status();
+                if let Err(e) = status {
+                    eprintln!("Failed to attach to tmux: {}", e);
+                    return Err(e.into());
+                }
+                // After detach, loop restarts tmmx
+            }
+            Ok(None) => return Ok(()), // Normal quit
+            Err(e) => return Err(e),
         }
     }
-
-    result.map(|_| ())
 }
 
 fn run_app(
